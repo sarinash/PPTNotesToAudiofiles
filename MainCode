@@ -1,0 +1,61 @@
+import numpy
+import pandas
+import os
+import glob
+subscription_key = '#####' # Input API adress
+# japaneast needs to be changed based on your region -> look at azure API and keys to figure out yours!
+import requests
+import xml.etree.ElementTree as ElementTree
+import datetime
+import collections 
+import collections.abc
+from pptx import Presentation
+file1 = '/content/texts/samplepptx.pptx'
+ppt=Presentation(file1)
+notes = []
+for page, slide in enumerate(ppt.slides):
+    # this is the notes that doesn't appear on the ppt slide,
+    # but really the 'presenter' note. 
+    textNote = slide.notes_slide.notes_text_frame.text
+    notes.append(textNote) 
+print(notes)
+txtfiles = []
+for file in glob.glob("/content/texts/*.txt"):
+  with open(file, 'r') as file:
+       txtfiles.append(file.read())   
+print(txtfiles)        
+for i , item  in enumerate(txtfiles):
+  text = item
+  output="AN1_01"+str(i)+"V1.mp3"
+  fetch_token_url = 'https://japaneast.api.cognitive.microsoft.com/sts/v1.0/issuetoken'
+  headers = {
+      'Ocp-Apim-Subscription-Key': subscription_key
+  }
+  response = requests.post(fetch_token_url, headers=headers)
+  access_token = str(response.text)
+  print(access_token)
+  constructed_url = 'https://japaneast.tts.speech.microsoft.com/cognitiveservices/v1'
+  headers = {
+      'Authorization': 'Bearer ' + access_token,
+      'Content-Type': 'application/ssml+xml',
+      'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
+  }
+  xml_body = ElementTree.Element('speak', version='1.0')
+  xml_body.set('{http://www.w3.org/XML/1998/namespace}lang', 'en-US')
+  voice = ElementTree.SubElement(xml_body, 'voice')
+  voice.set('{http://www.w3.org/XML/1998/namespace}lang', 'en-US')
+  voice.set('name', 'Microsoft Server Speech Text to Speech Voice (en-US, JennyNeural)')
+  prosody = ElementTree.SubElement(voice, 'prosody')
+  prosody.set('pitch','medium') # high
+  prosody.set('rate','medium') # fast
+  prosody.text = text
+  body = ElementTree.tostring(xml_body)
+  response = requests.post(constructed_url, headers=headers, data=body)
+  if response.status_code == 200:
+      with open(output, 'wb') as audio:
+          audio.write(response.content)
+          print("\nStatus code: " + str(response.status_code) + "\nYour TTS is ready for playback.\n")
+  else:
+      print("\nStatus code: " + str(response.status_code) + "\nSomething went wrong. Check your subscription key and headers.\n")
+  
+
